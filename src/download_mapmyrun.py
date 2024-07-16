@@ -11,11 +11,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 from selenium.webdriver.common.action_chains import ActionChains
 
-# Load credentials from .env file
-load_dotenv()
-USERNAME = os.getenv("MAPMYRUN_USERNAME")
-PASSWORD = os.getenv("MAPMYRUN_PASSWORD")
-
 LOGIN_URL = "https://www.mapmyrun.com/auth/login/"
 CSV_URL = 'https://www.mapmyfitness.com/workout/export/csv'
 
@@ -34,14 +29,14 @@ def set_up_driver(workout_files_dir):
     return driver
 
 
-def login(driver):
+def login(driver, username, password):
     """
-    Log in to MapMyRun with credentials from env file
+    Log in to MapMyRun with provided credentials
     """
     username_field = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "email-input")))
     password_field = driver.find_element(By.ID, "Password-input")
-    username_field.send_keys(USERNAME)
-    password_field.send_keys(PASSWORD)
+    username_field.send_keys(username)
+    password_field.send_keys(password)
 
     login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
     login_button.click()
@@ -96,14 +91,12 @@ def download_workout_files(driver, csv_file_path, directory):
                 three_dot_menu = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'MuiIconButton-root')]"))
                 )
-                # three_dot_menu.click()
                 click_element(driver, three_dot_menu)
 
                 # Wait for and click the TCX download option
                 tcx_download = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Download as TCX')]"))
                 )
-                # tcx_download.click()
                 click_element(driver, tcx_download)
 
                 # Wait for the download to complete
@@ -117,7 +110,7 @@ def download_workout_files(driver, csv_file_path, directory):
                 print(f"Error processing workout {workout_link}: {str(e)}")
 
 
-def main():
+def download_mapmyrun_data(username, password):
     project_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the script
     workout_files_dir = os.path.join(project_dir, "workout_files")
     os.makedirs(workout_files_dir, exist_ok=True)  # Create workout_files directory if it doesn't exist
@@ -126,7 +119,7 @@ def main():
 
     # Log in
     driver.get(LOGIN_URL)
-    login(driver)
+    login(driver, username, password)
     WebDriverWait(driver, 10).until(EC.url_contains("dashboard"))
 
     # Visit URL to download CSV file
@@ -134,7 +127,7 @@ def main():
 
     # Re-authenticate if necessary
     if "login" in driver.current_url:
-        login(driver)
+        login(driver, username, password)
 
     # Wait for the CSV download to complete
     wait_for_download(workout_files_dir, 120)
@@ -154,6 +147,3 @@ def main():
 
     # Close the browser
     driver.quit()
-
-if __name__ == "__main__":
-    main()

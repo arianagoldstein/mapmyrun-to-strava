@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>MapMyRun to Strava Transfer</title>
+    <script>
+      function checkForm() {
+          const username = document.getElementById('mapmyrun_username').value;
+          const password = document.getElementById('mapmyrun_password').value;
+          const stravaAuthenticated = strava_authenticated ? "true" : "false";
+          const letsGoButton = document.getElementById('lets_go_button');
+          letsGoButton.disabled = !(username && password && stravaAuthenticated);
+      }
+
+      // Function to save form data to localStorage
+      function saveFormData() {
+            const username = document.getElementById('mapmyrun_username').value;
+            const password = document.getElementById('mapmyrun_password').value;
+
+            // Save username and password to localStorage
+            localStorage.setItem('mapmyrunUsername', username);
+            localStorage.setItem('mapmyrunPassword', password);
+        }
+
+        // Function to load saved form data from localStorage
+        function loadFormData() {
+            const username = localStorage.getItem('mapmyrunUsername');
+            const password = localStorage.getItem('mapmyrunPassword');
+            
+            // Set input values if saved data exists
+            if (username) {
+                document.getElementById('mapmyrun_username').value = username;
+            }
+            if (password) {
+                document.getElementById('mapmyrun_password').value = password;
+            }
+        }
+
+
+      // Call loadFormData function on page load
+        window.onload = function() {
+            loadFormData();
+            checkForm();  // Check form status on page load
+        };
+        
+    </script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="mt-5">Welcome to MapMyRun to Strava Transfer</h1>
+
+      <form method="POST" action="/transfer" oninput="checkForm()">
+        <label for="mapmyrun_username">MapMyRun Username:</label>
+        <input type="text" id="mapmyrun_username" name="mapmyrun_username" required><br><br>
+
+        <label for="mapmyrun_password">MapMyRun Password:</label>
+        <input type="password" id="mapmyrun_password" name="mapmyrun_password" required><br><br>
+        
+        <button type="button" onclick="window.location.href='/login'">Authenticate with Strava</button>
+        {% if strava_authenticated %}
+            <span style="color: green;">&#10004;</span>
+        {% endif %}<br><br>
+
+        <button type="submit" id="lets_go_button" disabled>Let's Go</button>
+    </form>
+
+
+
+      <!-- <form id="transfer-form" method="POST" action="/transfer">
+        <div class="form-group">
+          <label for="mapmyrun_username">MapMyRun Username</label>
+          <input type="text" class="form-control" id="mapmyrun_username" name="mapmyrun_username" required>
+        </div>
+        <div class="form-group">
+          <label for="mapmyrun_password">MapMyRun Password</label>
+          <input type="password" class="form-control" id="mapmyrun_password" name="mapmyrun_password" required>
+        </div>
+    
+        {% if strava_authenticated %}
+        <p style="color: green;">Successfully authenticated with Strava! <span>&#10004;</span></p>
+        {% endif %}
+        
+        <form action="/login" method="GET">
+            <button type="submit">Authenticate with Strava</button>
+        </form>
+
+
+        <button type="submit" class="btn btn-primary">Let's Go</button>
+      </form> -->
+
+
+
+      <div class="progress mt-4" style="display: none;">
+        <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+      <div id="status" class="mt-4"></div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script>
+      $('#transfer-form').on('submit', function(event) {
+        event.preventDefault();
+        $('.progress').show();
+        $.ajax({
+          url: '/transfer',
+          method: 'POST',
+          data: $(this).serialize(),
+          success: function(response) {
+            $('#status').html(response.status);
+            $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
+          },
+          error: function() {
+            $('#status').html('Error during transfer.');
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
