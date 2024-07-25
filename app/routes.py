@@ -1,10 +1,10 @@
 import time
 from flask import Blueprint, render_template, request, redirect, session, url_for, jsonify
-from src import download_mapmyrun, upload_strava
 import os
 import requests
+import threading
 from dotenv import load_dotenv
-from src.download_mapmyrun import download_mapmyrun_data
+from src.download_mapmyrun import download_mapmyrun_data, get_progress
 from src.upload_strava import upload_strava_data
 
 # Create a blueprint
@@ -76,36 +76,43 @@ def get_access_token():
     return session["strava_access_token"]
 
 
-@main.route("/submit_transfer_info", methods=["POST"])
-def submit_transfer_info():
+def download_workouts(username, password):
+    try:
+        download_mapmyrun_data(username, password)
+    except Exception as e:
+        print(f"Error downloading workouts: {str(e)}")
+
+@main.route("/download", methods=["POST"])
+def download():
     mapmyrun_username = request.form["mapmyrun_username"]
     mapmyrun_password = request.form["mapmyrun_password"]
 
     session["mapmyrun_username"] = mapmyrun_username
     session["mapmyrun_password"] = mapmyrun_password
 
-    return redirect(url_for("main.transfer"))
+    # Start workout download in the background
+    threading.Thread(target=download_workouts, args=(mapmyrun_username, mapmyrun_password)).start()
+
+    return jsonify({"status": "success", "message": "Download started successfully."})
 
 
-@main.route("/transfer", methods=["POST"])
-def transfer():
+@main.route("/upload", methods=["POST"])
+def upload():
     if "strava_access_token" in session:
-        mapmyrun_username = request.form["mapmyrun_username"]
-        mapmyrun_password = request.form["mapmyrun_password"]
         strava_access_token = get_access_token()
 
-        session["mapmyrun_username"] = mapmyrun_username
-        session["mapmyrun_password"] = mapmyrun_password
-
-        # Download workouts from MapMyRun
-        print("About to download workouts from MapMyRun")
-        download_mapmyrun_data(mapmyrun_username, mapmyrun_password)
-
+        # Upload workouts to Strava
         print("About to upload workouts to Strava")
-        upload_strava_data(strava_access_token)
-
-        return redirect(url_for("main.home"))
-    
+        try:
+            upload_strava_data(strava_access_token)
+            return jsonify({"status": "success", "message": "Workouts uploaded successfully."})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)})
     else:
-        print("Please authenticate with Strava first!")
-        return redirect(url_for("main.home"))
+        return jsonify({"status": "error", "message": "Please authenticate with Strava first!"})
+
+
+@main.route("/download_progress")
+def download_progress():
+    progress = get_progress()
+    return jsonify({"progress": progress})

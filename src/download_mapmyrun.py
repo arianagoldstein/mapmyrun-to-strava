@@ -1,6 +1,7 @@
 import csv
 import os
 import time
+import json
 from dotenv import load_dotenv
 
 from selenium import webdriver
@@ -13,6 +14,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 LOGIN_URL = "https://www.mapmyrun.com/auth/login/"
 CSV_URL = 'https://www.mapmyfitness.com/workout/export/csv'
+PROGRESS_FILE = 'progress.json'
 
 
 def set_up_driver(workout_files_dir):
@@ -70,6 +72,22 @@ def click_element(driver, element):
         # If normal click fails, try JavaScript click
         driver.execute_script("arguments[0].click();", element)
 
+def update_progress(percent_complete):
+    """
+    Update the progress file with the current percentage complete
+    """
+    with open(PROGRESS_FILE, 'w') as f:
+        json.dump({'progress': percent_complete}, f)
+
+def get_progress():
+    """
+    Get the current progress from the progress file
+    """
+    if os.path.exists(PROGRESS_FILE):
+        with open(PROGRESS_FILE, 'r') as f:
+            return json.load(f).get('progress', 0)
+    return 0
+
 
 def download_workout_files(driver, csv_file_path, directory):
     """
@@ -77,9 +95,10 @@ def download_workout_files(driver, csv_file_path, directory):
     """
     with open(csv_file_path, 'r') as csvfile:
         csv_reader = csv.reader(csvfile)
-        next(csv_reader) # Skip header row
+        workouts = list(csv_reader)[1:] # Skip header row
+        total_workouts = len(workouts)
 
-        for row in csv_reader:
+        for i, row in enumerate(workouts):
             workout_link = row[-1] # Link is in last column of each row
 
             driver.get(workout_link) # Open workout page
@@ -109,6 +128,8 @@ def download_workout_files(driver, csv_file_path, directory):
             except (TimeoutException, NoSuchElementException) as e:
                 print(f"Error processing workout {workout_link}: {str(e)}")
 
+            percent_complete = ((i+1.0) / total_workouts) * 100
+            update_progress(percent_complete)
 
 def download_mapmyrun_data(username, password):
     project_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the script
