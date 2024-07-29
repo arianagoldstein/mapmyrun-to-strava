@@ -80,9 +80,11 @@
                     </div>
                     <div class="mb-3">
                         <label for="mapmyrun_password" class="form-label">MapMyRun Password:</label>
-                        <input type="password" id="mapmyrun_password" name="mapmyrun_password" class="form-control" required><br><br>
+                        <input type="password" id="mapmyrun_password" name="mapmyrun_password" class="form-control" required>
                     </div>
+                    <div id="mapmyrun_error" class="text-danger mb-3" style="display: none;"></div>
                     <button type="button" id="download_workouts_button" class="btn btn-primary" onclick="startDownloadWorkouts()" disabled>Download MapMyRun Workouts</button>
+                
                 </form>
 
                 <div class="progress mt-4" id="download_progress" style="display: none;">
@@ -112,7 +114,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         function startDownloadWorkouts() {
-            document.getElementById('download_progress').style.display = 'block';
+            document.getElementById('mapmyrun_error').style.display = 'none';
             $.ajax({
                 url: '/download',
                 method: 'POST',
@@ -123,13 +125,16 @@
                 success: function(response) {
                   if (response.status === "success") {
                     // Poll for progress updates
+                    document.getElementById('download_progress').style.display = 'block';
+                    document.getElementById('mapmyrun_error').style.display = 'none';
                     pollDownloadProgress();
                   } else {
-                    $('#status').html('Error during download.');
+                    document.getElementById('mapmyrun_error').innerHTML = response.message;
+                    document.getElementById('mapmyrun_error').style.display = 'block';
                   }
                 },
-                error: function() {
-                    $('#status').html('Error during download.');
+                error: function(response) {
+                    document.getElementById('mapmyrun_error').innerHTML = response.message;
                 }
             });
         }

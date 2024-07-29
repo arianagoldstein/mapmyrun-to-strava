@@ -43,6 +43,36 @@ def login(driver, username, password):
     login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
     login_button.click()
 
+    try:
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        raise Exception("Invalid login credentials")
+    except TimeoutException:
+        pass  # If the error message is not found, continue
+
+def check_login_status(username, password):
+    """
+    Check if the provided credentials are valid
+    """
+    driver = set_up_driver("workout_files")  # Use temporary directory for checking login
+    driver.get(LOGIN_URL)
+
+    username_field = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "email-input")))
+    password_field = driver.find_element(By.ID, "Password-input")
+    username_field.send_keys(username)
+    password_field.send_keys(password)
+
+    login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+    login_button.click()
+    
+    try:
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        driver.quit()
+        return False
+    except TimeoutException:
+        driver.quit()
+        return True
+    finally:
+        driver.quit()
 
 def wait_for_download(directory, timeout):
     """
@@ -138,17 +168,9 @@ def download_mapmyrun_data(username, password):
 
     driver = set_up_driver(workout_files_dir)
 
-    # Log in
-    driver.get(LOGIN_URL)
-    login(driver, username, password)
-    WebDriverWait(driver, 10).until(EC.url_contains("dashboard"))
-
     # Visit URL to download CSV file
     driver.get(CSV_URL)
-
-    # Re-authenticate if necessary
-    if "login" in driver.current_url:
-        login(driver, username, password)
+    login(driver, username, password)
 
     # Wait for the CSV download to complete
     wait_for_download(workout_files_dir, 120)

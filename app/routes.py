@@ -4,7 +4,7 @@ import os
 import requests
 import threading
 from dotenv import load_dotenv
-from src.download_mapmyrun import download_mapmyrun_data, get_progress
+from src.download_mapmyrun import download_mapmyrun_data, get_progress, check_login_status
 from src.upload_strava import upload_strava_data
 
 # Create a blueprint
@@ -90,11 +90,15 @@ def download():
     session["mapmyrun_username"] = mapmyrun_username
     session["mapmyrun_password"] = mapmyrun_password
 
-    # Start workout download in the background
-    threading.Thread(target=download_workouts, args=(mapmyrun_username, mapmyrun_password)).start()
-
-    return jsonify({"status": "success", "message": "Download started successfully."})
-
+    try:
+        if check_login_status(mapmyrun_username, mapmyrun_password):
+            # Start workout download in the background
+            threading.Thread(target=download_workouts, args=(mapmyrun_username, mapmyrun_password)).start()
+            return jsonify({"status": "success", "message": "Download started successfully."})
+        else:
+            return jsonify({"status": "error", "message": "Invalid MapMyRun credentials."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 @main.route("/upload", methods=["POST"])
 def upload():
