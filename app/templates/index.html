@@ -13,7 +13,16 @@
             const username = document.getElementById('mapmyrun_username').value;
             const password = document.getElementById('mapmyrun_password').value;
             const downloadButton = document.getElementById('download_workouts_button');
-            downloadButton.disabled = !(username && password);
+            const isEmailValid = validateEmail(username);
+            downloadButton.disabled = !(username && password && isEmailValid);
+
+            const emailError = document.getElementById('email_error');
+            emailError.style.display = isEmailValid ? 'none' : 'block';
+        }
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(String(email).toLowerCase());
         }
 
         function updateStep2Buttons() {
@@ -76,7 +85,8 @@
 
                     <div class="mb-3">
                         <label for="mapmyrun_username" class="form-label">MapMyRun Username:</label>
-                        <input type="text" id="mapmyrun_username" name="mapmyrun_username" class="form-control" required>
+                        <input type="email" id="mapmyrun_username" name="mapmyrun_username" class="form-control" required>
+                        <div id="email_error" class="text-danger mt-3" style="display: none;">Invalid email format.</div>
                     </div>
                     <div class="mb-3">
                         <label for="mapmyrun_password" class="form-label">MapMyRun Password:</label>
@@ -114,6 +124,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         function startDownloadWorkouts() {
+            document.getElementById('download_workouts_button').disabled = true;
             document.getElementById('mapmyrun_error').style.display = 'none';
             $.ajax({
                 url: '/download',

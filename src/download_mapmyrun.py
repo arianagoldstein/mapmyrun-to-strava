@@ -44,7 +44,7 @@ def login(driver, username, password):
     login_button.click()
 
     try:
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
         raise Exception("Invalid login credentials")
     except TimeoutException:
         pass  # If the error message is not found, continue
@@ -65,7 +65,7 @@ def check_login_status(username, password):
     login_button.click()
     
     try:
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
         driver.quit()
         return False
     except TimeoutException:
