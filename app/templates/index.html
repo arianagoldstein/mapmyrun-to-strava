@@ -6,55 +6,232 @@
     <title>MapMyRun to Strava Transfer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <script>
-        let mapMyRunAuthenticated = false;
-        let stravaAuthenticated = strava_authenticated ? 'true' : 'false';
+        const AppState = {
+            INITIAL: 'initial',
+            DOWNLOADING: 'downloading',
+            DOWNLOAD_COMPLETE: 'download_complete',
+            STRAVA_AUTHENTICATED: 'strava_authenticated',
+            UPLOADING: 'uploading',
+            UPLOAD_COMPLETE: 'upload_complete',
+        };
+
+        let currentState = AppState.INITIAL;
+
+        function setState(newState) {
+            /*
+            * Function to set the current app state.
+            */
+            currentState = newState;
+            console.log('State:', currentState);
+            updateUI();
+            saveState();
+        }
+
+        function updateUI() {
+            /*
+            * Function to update the UI based on the current app state.
+            */
+            const downloadButton = document.getElementById('download_workouts_button');
+            const authenticateStravaButton = document.getElementById('authenticate_strava_button');
+            const uploadWorkoutsButton = document.getElementById('upload_workouts_button');
+            const downloadProgress = document.getElementById('download_progress');
+            const downloadProgressBar = document.getElementById('download_progress_bar');
+            const uploadProgress = document.getElementById('upload_progress');
+            const uploadProgressBar = document.getElementById('upload_progress_bar');
+            const stravaAuthMessage = document.getElementById('strava_auth_message');
+            const resetButton = document.getElementById('reset_button');
+
+            // Reset all elements
+            downloadButton.disabled = true;
+            authenticateStravaButton.disabled = true;
+            uploadWorkoutsButton.disabled = true;
+            downloadProgress.style.display = 'none';
+            uploadProgress.style.display = 'none';
+            stravaAuthMessage.style.display = 'none';
+
+            switch (currentState) {
+                case AppState.DOWNLOADING:
+                    downloadButton.disabled = true;
+                    downloadProgress.style.display = 'block';
+                    break;
+                case AppState.DOWNLOAD_COMPLETE:
+                    downloadButton.disabled = true;
+                    downloadProgress.style.display = 'block';
+                    downloadProgressBar.style.width = '100%';
+                    downloadProgressBar.innerHTML = '100%';
+                    downloadProgressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                    authenticateStravaButton.disabled = false;
+                    break;
+                case AppState.STRAVA_AUTHENTICATED:
+                    downloadButton.disabled = true;
+                    downloadProgress.style.display = 'block';
+                    downloadProgressBar.style.width = '100%';
+                    downloadProgressBar.innerHTML = '100%';
+                    downloadProgressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                    authenticateStravaButton.disabled = true;
+                    uploadWorkoutsButton.disabled = false;
+                    stravaAuthMessage.style.display = 'block';
+                    stravaAuthMessage.innerHTML = 'Strava authentication successful!';
+                    break;
+                case AppState.UPLOADING:
+                    downloadButton.disabled = true;
+                    authenticateStravaButton.disabled = true;
+                    uploadWorkoutsButton.disabled = true;
+                    uploadProgress.style.display = 'block';
+                    break;
+                case AppState.UPLOAD_COMPLETE:
+                    downloadButton.disabled = true;
+                    authenticateStravaButton.disabled = true;
+                    uploadWorkoutsButton.disabled = true;
+                    uploadProgress.style.display = 'xblock';
+                    uploadProgressBar.style.width = '100%';
+                    uploadProgressBar.innerHTML = '100%';
+                    uploadProgressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                    break;
+            }
+        }
+
+        function saveState() {
+            /*
+            * Function to save the app state to localStorage.
+            */
+            localStorage.setItem('appState', currentState);
+            localStorage.setItem('mapmyrunUsername', document.getElementById('mapmyrun_username').value);
+            localStorage.setItem('mapmyrunPassword', document.getElementById('mapmyrun_password').value);
+        }
+
+        function loadState() {
+            /*
+            * Function to load the app state from localStorage.
+            */
+            const savedState = localStorage.getItem('appState');
+            if (savedState) {
+                setState(savedState);
+            }
+            const savedUsername = localStorage.getItem('mapmyrunUsername');
+            const savedPassword = localStorage.getItem('mapmyrunPassword');
+            if (savedUsername) document.getElementById('mapmyrun_username').value = savedUsername;
+            if (savedPassword) document.getElementById('mapmyrun_password').value = savedPassword;
+        }
+
 
         function checkStep1Form() {
+            /*
+            * Function to check if the MapMyRun login fields are filled out and valid.
+            * If the form is valid, enable the download workouts button.
+            */
             const username = document.getElementById('mapmyrun_username').value;
             const password = document.getElementById('mapmyrun_password').value;
             const downloadButton = document.getElementById('download_workouts_button');
             const isEmailValid = validateEmail(username);
-            downloadButton.disabled = !(username && password && isEmailValid);
+            downloadButton.disabled = !(username && password && isEmailValid) || currentState === AppState.DOWNLOADING;
 
             const emailError = document.getElementById('email_error');
             emailError.style.display = isEmailValid ? 'none' : 'block';
         }
 
         function validateEmail(email) {
+            /*
+            * Function to validate an email address.
+            * Returns true if the email is valid, false otherwise.
+            */
             const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return re.test(String(email).toLowerCase());
         }
 
-        function updateStep2Buttons() {
-            const authenticateStravaButton = document.getElementById('authenticate_strava_button');
-            const uploadWorkoutsButton = document.getElementById('upload_workouts_button');
-
-            authenticateStravaButton.disabled = !mapMyRunAuthenticated;
-            uploadWorkoutsButton.disabled = !(mapMyRunAuthenticated && stravaAuthenticated);
+        function startDownloadWorkouts() {
+            document.getElementById('download_workouts_button').disabled = true;
+            document.getElementById('mapmyrun_error').style.display = 'none';
+            $.ajax({
+                url: '/download',
+                method: 'POST',
+                data: {
+                    mapmyrun_username: document.getElementById('mapmyrun_username').value,
+                    mapmyrun_password: document.getElementById('mapmyrun_password').value
+                },
+                success: function(response) {
+                  if (response.status === "success") {
+                    // Poll for progress updates
+                    document.getElementById('mapmyrun_error').style.display = 'none';
+                    setState(AppState.DOWNLOADING);
+                    pollDownloadProgress();
+                  } else {
+                    document.getElementById('mapmyrun_error').innerHTML = response.message;
+                    document.getElementById('mapmyrun_error').style.display = 'block';
+                  }
+                },
+                error: function(response) {
+                    document.getElementById('mapmyrun_error').innerHTML = response.message;
+                }
+            });
         }
 
-        // Function to save form data to localStorage
-        function saveFormData() {
-            const username = document.getElementById('mapmyrun_username').value;
-            const password = document.getElementById('mapmyrun_password').value;
-            localStorage.setItem('mapmyrunUsername', username);
-            localStorage.setItem('mapmyrunPassword', password);
+        function pollDownloadProgress() {
+            $.ajax({
+                url: '/download_progress',
+                method: 'GET',
+                success: function(response) {
+                    // Update progress bar
+                    const percentage = parseFloat(response.progress).toFixed(2);
+                    const progressBar = $('#download_progress_bar');
+
+                    progressBar.css('width', percentage + '%')
+                                .attr('aria-valuenow', percentage)
+                                .text(percentage + '%');
+
+                    if (percentage < 100) {
+                        setTimeout(pollDownloadProgress, 5000); // Poll every 5 seconds
+                    } else {
+                        setState(AppState.DOWNLOAD_COMPLETE);
+                        // updateStep2Buttons();
+                    }
+                },
+                error: function() {
+                    $('#status').html('Error fetching progress.');
+                }
+            });
         }
 
-        // Function to load saved form data from localStorage
-        function loadFormData() {
-            const username = localStorage.getItem('mapmyrunUsername');
-            const password = localStorage.getItem('mapmyrunPassword');
-            if (username) document.getElementById('mapmyrun_username').value = username;
-            if (password) document.getElementById('mapmyrun_password').value = password;
+        function startUploadWorkouts() {
+            setState(AppState.UPLOADING);
+            $.ajax({
+                url: '/upload',
+                method: 'POST',
+                success: function(response) {
+                    // Update progress bar
+                    $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
+                    $('#status').html('Workouts uploaded successfully!');
+                    setState(AppState.UPLOAD_COMPLETE);
+                },
+                error: function() {
+                    $('#status').html('Error during upload.');
+                }
+            });
         }
 
-        // Call loadFormData function on page load
-        window.onload = function() {
-            loadFormData();
+        function resetState() {
+            /*
+            * Function to reset the app state and clear the form fields.
+            */
+            setState(AppState.INITIAL);
+            document.getElementById('mapmyrun_username').value = '';
+            document.getElementById('mapmyrun_password').value = '';
+            document.getElementById('download_progress').style.display = 'none';
+            document.getElementById('upload_progress').style.display = 'none';
+            document.getElementById('strava_auth_message').style.display = 'none';
+            document.getElementById('mapmyrun_error').style.display = 'none';
             checkStep1Form();
-            updateStep2Buttons();
-        };
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadState();
+            checkStep1Form();
+            var stravaAuthData = document.getElementById('strava-auth-data');
+            if (stravaAuthData.dataset.stravaAuthenticated === 'true' && currentState === AppState.DOWNLOAD_COMPLETE) {
+                setState(AppState.STRAVA_AUTHENTICATED);
+            }
+        });
+
     </script>
 
     <style>
@@ -74,6 +251,8 @@
 
 </head>
 <body>
+    <div id="strava-auth-data" data-strava-authenticated="{{ strava_authenticated|lower }}"></div>
+
     <div class="container">
         <h1 class="mb-4 mt-4">Welcome to MapMyRun to Strava Transfer</h1>
 
@@ -81,7 +260,7 @@
          <div class="card mb-4">
             <div class="card-body">
                 <h3 class="card-title">Step 1: Authenticate with MapMyRun and Download Workouts</h3>
-                <form method="POST" oninput="checkStep1Form(); saveFormData();">
+                <form method="POST" oninput="checkStep1Form();">
 
                     <div class="mb-3">
                         <label for="mapmyrun_username" class="form-label">MapMyRun Username:</label>
@@ -111,6 +290,7 @@
                 
                 <button type="button" id="authenticate_strava_button" class="btn btn-secondary" onclick="window.location.href='/login'" disabled>Authenticate with Strava</button>
                 <button type="button" id="upload_workouts_button" class="btn btn-primary" onclick="startUploadWorkouts()" disabled>Upload Workouts to Strava</button>
+                <div id="strava_auth_message" class="alert alert-success mt-3" style="display: none;"></div>
                 
                 <div class="progress mt-4" id="upload_progress" style="display: none;">
                     <div id="upload_progress_bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
@@ -119,80 +299,12 @@
             </div>
         </div>  <!-- End of Step 2 card -->
 
+        <div class="mt-4">
+            <button id="reset_button" class="btn btn-danger" onclick="resetState()">Reset</button>
+        </div>
+
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        function startDownloadWorkouts() {
-            document.getElementById('download_workouts_button').disabled = true;
-            document.getElementById('mapmyrun_error').style.display = 'none';
-            $.ajax({
-                url: '/download',
-                method: 'POST',
-                data: {
-                    mapmyrun_username: document.getElementById('mapmyrun_username').value,
-                    mapmyrun_password: document.getElementById('mapmyrun_password').value
-                },
-                success: function(response) {
-                  if (response.status === "success") {
-                    // Poll for progress updates
-                    document.getElementById('download_progress').style.display = 'block';
-                    document.getElementById('mapmyrun_error').style.display = 'none';
-                    pollDownloadProgress();
-                  } else {
-                    document.getElementById('mapmyrun_error').innerHTML = response.message;
-                    document.getElementById('mapmyrun_error').style.display = 'block';
-                  }
-                },
-                error: function(response) {
-                    document.getElementById('mapmyrun_error').innerHTML = response.message;
-                }
-            });
-        }
-
-
-        function pollDownloadProgress() {
-            $.ajax({
-                url: '/download_progress',
-                method: 'GET',
-                success: function(response) {
-                    // Update progress bar
-                    const percentage = parseFloat(response.progress).toFixed(2);
-                    const progressBar = $('#download_progress_bar');
-
-                    progressBar.css('width', percentage + '%')
-                                .attr('aria-valuenow', percentage)
-                                .text(percentage + '%');
-
-                    if (percentage < 100) {
-                        setTimeout(pollDownloadProgress, 5000); // Poll every 5 seconds
-                    } else {
-                        $('#status').html('Download complete!');
-                        mapMyRunAuthenticated = true;
-                        updateStep2Buttons();
-                    }
-                },
-                error: function() {
-                    $('#status').html('Error fetching progress.');
-                }
-            });
-        }
-
-        function startUploadWorkouts() {
-            document.getElementById('upload_progress').style.display = 'block';
-            $.ajax({
-                url: '/upload',
-                method: 'POST',
-                success: function(response) {
-                    // Update progress bar
-                    $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
-                    $('#status').html('Workouts uploaded successfully!');
-                },
-                error: function() {
-                    $('#status').html('Error during upload.');
-                }
-            });
-        }
-    </script>
 </body>
 </html>
