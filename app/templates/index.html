@@ -83,7 +83,7 @@
                     downloadButton.disabled = true;
                     authenticateStravaButton.disabled = true;
                     uploadWorkoutsButton.disabled = true;
-                    uploadProgress.style.display = 'xblock';
+                    uploadProgress.style.display = 'block';
                     uploadProgressBar.style.width = '100%';
                     uploadProgressBar.innerHTML = '100%';
                     uploadProgressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
@@ -104,14 +104,15 @@
             /*
             * Function to load the app state from localStorage.
             */
-            const savedState = localStorage.getItem('appState');
-            if (savedState) {
-                setState(savedState);
-            }
             const savedUsername = localStorage.getItem('mapmyrunUsername');
             const savedPassword = localStorage.getItem('mapmyrunPassword');
             if (savedUsername) document.getElementById('mapmyrun_username').value = savedUsername;
             if (savedPassword) document.getElementById('mapmyrun_password').value = savedPassword;
+
+            const savedState = localStorage.getItem('appState');
+            if (savedState) {
+                setState(savedState);
+            }
         }
 
 
@@ -140,6 +141,9 @@
         }
 
         function startDownloadWorkouts() {
+            /*
+            * Function to start the workout download process.
+            */
             document.getElementById('download_workouts_button').disabled = true;
             document.getElementById('mapmyrun_error').style.display = 'none';
             $.ajax({
@@ -158,15 +162,20 @@
                   } else {
                     document.getElementById('mapmyrun_error').innerHTML = response.message;
                     document.getElementById('mapmyrun_error').style.display = 'block';
+                    setState(AppState.INITIAL);
                   }
                 },
                 error: function(response) {
                     document.getElementById('mapmyrun_error').innerHTML = response.message;
+                    setState(AppState.INITIAL);
                 }
             });
         }
 
         function pollDownloadProgress() {
+            /*
+            * Function to poll the server for download progress updates.
+            */
             $.ajax({
                 url: '/download_progress',
                 method: 'GET',
@@ -179,32 +188,61 @@
                                 .attr('aria-valuenow', percentage)
                                 .text(percentage + '%');
 
-                    if (percentage < 100) {
-                        setTimeout(pollDownloadProgress, 5000); // Poll every 5 seconds
-                    } else {
+                    if (percentage >= 100) {
                         setState(AppState.DOWNLOAD_COMPLETE);
-                        // updateStep2Buttons();
+                    } else {
+                        setTimeout(pollDownloadProgress, 5000); // Poll every 5 seconds
                     }
                 },
                 error: function() {
                     $('#status').html('Error fetching progress.');
+                    setState(AppState.INITIAL);
                 }
             });
         }
 
         function startUploadWorkouts() {
+            /*
+            * Function to start the workout upload process.
+            */
             setState(AppState.UPLOADING);
             $.ajax({
                 url: '/upload',
                 method: 'POST',
                 success: function(response) {
-                    // Update progress bar
-                    $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
-                    $('#status').html('Workouts uploaded successfully!');
-                    setState(AppState.UPLOAD_COMPLETE);
+                    // Start polling for progress updates
+                    pollUploadProgress();
                 },
                 error: function() {
                     $('#status').html('Error during upload.');
+                }
+            });
+        }
+
+        function pollUploadProgress() {
+            /*
+            * Function to poll the server for upload progress updates.
+            */
+            $.ajax({
+                url: '/upload_progress',
+                method: 'GET',
+                success: function(response) {
+                    // Update progress bar
+                    const percentage = parseFloat(response.progress).toFixed(2);
+                    const progressBar = $('#upload_progress_bar');
+
+                    progressBar.css('width', percentage + '%')
+                                .attr('aria-valuenow', percentage)
+                                .text(percentage + '%');
+                    
+                    if (percentage >= 100) {
+                        setState(AppState.UPLOAD_COMPLETE);
+                    } else {
+                        setTimeout(pollUploadProgress, 5000); // Poll every 5 seconds
+                    }
+                },
+                error: function() {
+                    $('#status').html('Error fetching upload progress.');
                 }
             });
         }
@@ -216,14 +254,30 @@
             setState(AppState.INITIAL);
             document.getElementById('mapmyrun_username').value = '';
             document.getElementById('mapmyrun_password').value = '';
+
+            // Reset download progress bar
+            const downloadProgressBar = document.getElementById('download_progress_bar');
+            downloadProgressBar.style.width = '0%';
+            downloadProgressBar.innerHTML = '0%';
+            downloadProgressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
             document.getElementById('download_progress').style.display = 'none';
+
+            // Reset upload progress bar
+            const uploadProgressBar = document.getElementById('upload_progress_bar');
+            uploadProgressBar.style.width = '0%';
+            uploadProgressBar.innerHTML = '0%';
+            uploadProgressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
             document.getElementById('upload_progress').style.display = 'none';
+
             document.getElementById('strava_auth_message').style.display = 'none';
             document.getElementById('mapmyrun_error').style.display = 'none';
             checkStep1Form();
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            /*  
+            * Function to run when the page is loaded.
+            */
             loadState();
             checkStep1Form();
             var stravaAuthData = document.getElementById('strava-auth-data');
@@ -241,6 +295,18 @@
             overflow: hidden;
         }
         #download_progress_bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            min-width: 4em;  /* Ensure it's visible even at very low percentages */
+        }
+        #upload_progress {
+            position: relative;
+            height: 20px;
+            overflow: hidden;
+        }
+        #upload_progress_bar {
             position: absolute;
             top: 0;
             left: 0;
@@ -293,7 +359,7 @@
                 <div id="strava_auth_message" class="alert alert-success mt-3" style="display: none;"></div>
                 
                 <div class="progress mt-4" id="upload_progress" style="display: none;">
-                    <div id="upload_progress_bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div id="upload_progress_bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
                 </div>
 
             </div>

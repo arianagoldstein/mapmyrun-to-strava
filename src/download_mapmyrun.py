@@ -1,8 +1,7 @@
 import csv
 import os
 import time
-import json
-from dotenv import load_dotenv
+from src.utils import update_progress
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -14,7 +13,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 LOGIN_URL = "https://www.mapmyrun.com/auth/login/"
 CSV_URL = 'https://www.mapmyfitness.com/workout/export/csv'
-PROGRESS_FILE = 'progress.json'
+PROGRESS_FILE = 'download_progress.json'
 
 
 def set_up_driver(workout_files_dir):
@@ -44,7 +43,7 @@ def login(driver, username, password):
     login_button.click()
 
     try:
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
         raise Exception("Invalid login credentials")
     except TimeoutException:
         pass  # If the error message is not found, continue
@@ -65,7 +64,7 @@ def check_login_status(username, password):
     login_button.click()
     
     try:
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
         driver.quit()
         return False
     except TimeoutException:
@@ -73,6 +72,7 @@ def check_login_status(username, password):
         return True
     finally:
         driver.quit()
+        return True
 
 def wait_for_download(directory, timeout):
     """
@@ -101,22 +101,6 @@ def click_element(driver, element):
     except ElementClickInterceptedException:
         # If normal click fails, try JavaScript click
         driver.execute_script("arguments[0].click();", element)
-
-def update_progress(percent_complete):
-    """
-    Update the progress file with the current percentage complete
-    """
-    with open(PROGRESS_FILE, 'w') as f:
-        json.dump({'progress': percent_complete}, f)
-
-def get_progress():
-    """
-    Get the current progress from the progress file
-    """
-    if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE, 'r') as f:
-            return json.load(f).get('progress', 0)
-    return 0
 
 
 def download_workout_files(driver, csv_file_path, directory):
@@ -159,7 +143,8 @@ def download_workout_files(driver, csv_file_path, directory):
                 print(f"Error processing workout {workout_link}: {str(e)}")
 
             percent_complete = ((i+1.0) / total_workouts) * 100
-            update_progress(percent_complete)
+            update_progress(percent_complete, PROGRESS_FILE)
+
 
 def download_mapmyrun_data(username, password):
     project_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the script

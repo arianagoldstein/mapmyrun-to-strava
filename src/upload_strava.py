@@ -2,14 +2,15 @@ import os
 import re
 from dotenv import load_dotenv
 from stravalib.client import Client
+from src.utils import update_progress
 
 # Load credentials from .env file
 load_dotenv()
 
 # Directory with TCX files
 TCX_DIRECTORY = "src/workout_files"
+PROGRESS_FILE = 'upload_progress.json'
 client = Client()
-
 
 def upload_activity(file_path, activity_type, activity_name):
     """
@@ -47,13 +48,19 @@ def upload_strava_data(access_token):
     Upload all TCX files in the TCX_DIRECTORY
     """
     client.access_token = access_token
-    for filename in os.listdir(TCX_DIRECTORY):
-        if filename.endswith(".tcx"):
-            file_path = os.path.join(TCX_DIRECTORY, filename)
-            activity_name, activity_type = parse_filename(filename)
-            try:
-                activity = upload_activity(file_path, activity_type, activity_name)
-                print(f"Uploaded {filename}: Activity ID {activity.id}")
-            except Exception as e:
-                print(f"Failed to upload {filename}: {str(e)}")
+    tcx_files = [f for f in os.listdir(TCX_DIRECTORY) if f.endswith(".tcx")]
+    total_files = len(tcx_files)
+
+    for i, filename in enumerate(tcx_files):
+        file_path = os.path.join(TCX_DIRECTORY, filename)
+        activity_name, activity_type = parse_filename(filename)
+        try:
+            activity = upload_activity(file_path, activity_type, activity_name)
+            print(f"Uploaded {filename}: Activity ID {activity.id}")
+        except Exception as e:
+            print(f"Failed to upload {filename}: {str(e)}")
+
+        percent_complete = ((i+1) / total_files) * 100
+        update_progress(percent_complete, PROGRESS_FILE)
+
     return "Strava workouts uploaded successfully!"
