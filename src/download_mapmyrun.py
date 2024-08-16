@@ -43,7 +43,7 @@ def login(driver, username, password):
     login_button.click()
 
     try:
-        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Email or password does not match our records')]")))
         raise Exception("Invalid login credentials")
     except TimeoutException:
         pass  # If the error message is not found, continue
@@ -158,7 +158,7 @@ def download_mapmyrun_data(username, password):
     login(driver, username, password)
 
     # Wait for the CSV download to complete
-    wait_for_download(workout_files_dir, 120)
+    wait_for_download(workout_files_dir, 20)
 
     # Find the most recently downloaded CSV file
     csv_file_path = max((os.path.join(workout_files_dir, f) for f in os.listdir(workout_files_dir)),
